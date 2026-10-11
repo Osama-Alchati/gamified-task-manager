@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // Supabase/Neon: pooled URL above, direct URL here for migrations
+}
+
+enum LevelStatus {
+  LOCKED
+  ACTIVE
+  COMPLETED
+}
+
+enum TaskType {
+  STANDARD
+  DAILY_HABIT
+  RESEARCH_SPIKE
+  CREATIVE_DELIVERABLE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model User {
+  id            String        @id @default(uuid())
+  email         String        @unique
+  name          String?
+  image         String?
+  totalXp       Int           @default(0)
+  currentStreak Int           @default(0)
+  lastActiveAt  DateTime?
+  createdAt     DateTime      @default(now())
+  worlds        World[]
+  activity      ActivityLog[]
+  // TODO(phase 1): add Account / Session / VerificationToken models from the Auth.js Prisma adapter
+}
+
+// The spec calls this entity "Map"; it is named World here to match the UI and the /worlds/[worldId] route.
+model World {
+  id          String   @id @default(uuid())
+  userId      String
+  title       String
+  description String?
+  themeKey    String   @default("forest") // forest | desert | space
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  levels      Level[]
+
+  @@index([userId])
+}
+
+model Level {
+  id          String      @id @default(uuid())
+  worldId     String
+  title       String
+  icon        String?
+  posX        Float
+  posY        Float
+  status      LevelStatus @default(LOCKED)
+  levelOrder  Int
+  isBoss      Boolean     @default(false)
+  xpBounty    Int? // null = default (50, or 150 for boss levels)
+  world       World       @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  prerequisiteEdges LevelDependency[] @relation("EdgeTarget") // edges pointing INTO this level
+  unlockEdges       LevelDependency[] @relation("EdgeSource") // edges leaving this level
+
+  @@index([worldId, levelOrder], map: "idx_levels_map_order")
+}
+
+// Directed edge source -> target: `source` must be completed before `target` unlocks.
+// Self-reference and cycle checks live in lib/dag.ts (wouldCreateCycle) and run inside the write transaction.
+model LevelDependency {
+  id            String   @id @default(uuid())
+  sourceLevelId String
+  targetLevelId String
+  conditionType String   @default("ALL_COMPLETE")
+  createdAt     DateTime @default(now())
+  source        Level    @relation("EdgeSource", fields: [sourceLevelId], references: [id], onDelete: Cascade)
+  target        Level    @relation("EdgeTarget", fields: [targetLevelId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceLevelId, targetLevelId], map: "uq_dependency_edge")
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  levelId     String
+  title       String
+  description String? // Markdown body: notes, links, code
+  taskType    TaskType  @default(STANDARD)
+  priority    Priority  @default(MEDIUM)
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  dueDate     DateTime?
+  estimateMin Int?
+  sortOrder   Int       @default(0)
+  level       Level     @relation(fields: [levelId], references: [id], onDelete: Cascade)
+
+  @@index([levelId, isCompleted], map: "idx_tasks_level_completed")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String
+  actionType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)], map: "idx_activity_user_created")
+}

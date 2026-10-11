@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Questline - gamified roadmap</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#23304a;--sky:#bfe8f5;--ground:#bfe9ae;--panel:#fffaf0;--sun:#ffc83d;--coral:#ff6b5b;--lock:#aab3bf;--mint:#3fbf8f;--line:#23304a30;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#eaf1ff;--sky:#18253d;--ground:#1d3b34;--panel:#26324a;--lock:#4b5668;--line:#ffffff30}}
+:root[data-theme="dark"]{--ink:#eaf1ff;--sky:#18253d;--ground:#1d3b34;--panel:#26324a;--lock:#4b5668;--line:#ffffff30}
+html,body{height:100%;margin:0}
+body{font-family:'Baloo 2',ui-rounded,system-ui,sans-serif;color:var(--ink);background:linear-gradient(var(--sky),var(--ground));overflow:hidden;background-color:var(--sky)}
+svg{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+svg:active{cursor:grabbing}
+#hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:10px;right:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;pointer-events:none}
+.pill{pointer-events:auto;background:var(--panel);border:3px solid var(--ink);border-radius:18px;padding:4px 14px;box-shadow:0 4px 0 var(--ink);font-weight:700}
+.lv{font-size:1.15rem;font-weight:800}
+.bar{width:150px;height:14px;border:2px solid var(--ink);border-radius:9px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--sun);transition:width .35s cubic-bezier(.3,1.6,.5,1)}
+.xp{display:flex;align-items:center;gap:8px}
+#tools{position:fixed;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;font-weight:700;color:var(--ink);background:var(--panel);border:3px solid var(--ink);border-radius:14px;padding:4px 12px;box-shadow:0 3px 0 var(--ink);cursor:pointer}
+button:active{transform:translateY(3px);box-shadow:none}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+#log{position:fixed;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);max-width:260px;font-size:.82rem;background:var(--panel);border:3px solid var(--ink);border-radius:14px;padding:6px 10px;opacity:.95}
+#log div{margin:2px 0}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(380px,100%);box-sizing:border-box;background:var(--panel);border-left:4px solid var(--ink);padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 16px;transform:translateX(105%);transition:transform .35s cubic-bezier(.3,1.3,.5,1);overflow:auto;z-index:5}
+#drawer.open{transform:none}
+#drawer h2{margin:0 0 2px;font-size:1.5rem;font-weight:800}
+.sub{opacity:.75;font-size:.9rem}
+.task{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:2px dashed var(--line)}
+.task input[type=checkbox]{width:24px;height:24px;accent-color:var(--mint);flex:none}
+.task.done span{text-decoration:line-through;opacity:.55}
+.chip{font-size:.72rem;border:2px solid var(--ink);border-radius:9px;padding:0 7px;margin-left:auto;white-space:nowrap}
+.chip.Critical{background:var(--coral);color:#fff;border-color:var(--coral)}.chip.High{background:var(--sun);color:#23304a;border-color:var(--sun)}
+#add{display:flex;gap:6px;margin-top:12px}
+#add input{flex:1;min-width:0;font:inherit;border:3px solid var(--ink);border-radius:12px;padding:3px 10px;background:var(--panel);color:var(--ink)}
+#add select{font:inherit;border:3px solid var(--ink);border-radius:12px;background:var(--panel);color:var(--ink)}
+.pg{height:16px;border:3px solid var(--ink);border-radius:10px;overflow:hidden;margin:10px 0;background:var(--line)}
+.pg i{display:block;height:100%;background:var(--mint);transition:width .3s}
+#toast{position:fixed;left:50%;top:76px;transform:translate(-50%,-20px);background:var(--ink);color:var(--panel);padding:6px 18px;border-radius:16px;font-weight:800;opacity:0;transition:.3s;pointer-events:none;z-index:9;text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.cf{position:fixed;width:10px;height:14px;border-radius:2px;z-index:8;pointer-events:none;animation:fall 1.4s ease-out forwards}
+@keyframes fall{to{transform:translate(var(--dx),var(--dy)) rotate(720deg);opacity:0}}
+.node{cursor:pointer}
+.node.active>circle.body{animation:pulse 1.8s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pulse{50%{transform:scale(1.09)}}
+.edge{fill:none;stroke:var(--lock);stroke-width:8;stroke-linecap:round;stroke-dasharray:2 14}
+.edge.lit{stroke:var(--sun);stroke-dasharray:none}
+.edge.flow{stroke:var(--mint);animation:dash 1s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-16}}
+.lbl{font-weight:800;font-size:15px;fill:var(--ink);text-anchor:middle;paint-order:stroke;stroke:var(--panel);stroke-width:5px;stroke-linejoin:round}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body>
+<svg id="map" aria-label="Roadmap overworld"><g id="world"></g></svg>
+<div id="hud">
+  <div class="pill lv" id="lv"></div>
+  <div class="pill xp"><div class="bar"><i id="xpb"></i></div><span id="xpt"></span></div>
+  <div class="pill" id="streak"></div>
+</div>
+<div id="tools">
+  <button id="center">Center active level</button>
+  <button id="fit">Zoom to fit</button>
+  <button id="reset">Reset demo</button>
+</div>
+<div id="log" aria-live="polite"></div>
+<aside id="drawer" aria-label="Level tasks"></aside>
+<div id="toast" role="status"></div>
+<script>
+const KEY='questline-demo-v1',NS='http://www.w3.org/2000/svg';
+let n=0;const mk=(t,p='Medium')=>({id:'t'+(++n),t,p,done:false});
+const seed=()=>({streak:0,last:null,log:[],levels:[
+ {id:'a',title:'Boot camp',deps:[],tasks:[mk('Run create-next-app'),mk('Write Prisma schema','High'),mk('Migrate the database')]},
+ {id:'b',title:'First map',deps:['a'],tasks:[mk('Render XYFlow canvas','High'),mk('Build LevelNode component')]},
+ {id:'c',title:'Task drawer',deps:['b'],tasks:[mk('Slide-over drawer'),mk('Optimistic checkbox toggle','Critical')]},
+ {id:'d',title:'HUD',deps:['b'],tasks:[mk('XP bar and streak badge'),mk('Recent activity feed','Low')]},
+ {id:'e',title:'Game loop',deps:['c','d'],tasks:[mk('XP formula','High'),mk('DAG auto-unlock','Critical')]},
+ {id:'f',title:'Mobile pass',deps:['e'],tasks:[mk('Pinch to zoom'),mk('Focus-active button')]},
+ {id:'g',title:'Ship it',boss:1,deps:['f'],tasks:[mk('Deploy','Critical'),mk('Invite 3 testers')]}]});
+let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.levels){S=seed()}else{n=S.levels.reduce((m,l)=>l.tasks.reduce((a,t)=>Math.max(a,+t.id.slice(1)),m),0)}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id),esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const by=id=>S.levels.find(l=>l.id===id);
+
+/* --- progression engine: levels form a DAG; status is derived, never stored --- */
+const done=l=>l.tasks.length>0&&l.tasks.every(t=>t.done);
+const status=l=>done(l)?'done':l.deps.every(d=>done(by(d)))?'active':'locked';
+const bounty=l=>l.boss?150:50;
+const totalXp=()=>S.levels.reduce((x,l)=>x+l.tasks.filter(t=>t.done).length*10+(done(l)?bounty(l):0),0);
+const th=L=>Math.round(40*Math.pow(L-1,1.6));       /* XP needed to reach level L */
+function charLevel(xp){let L=1;while(xp>=th(L+1))L++;return L}
+function hasCycle(){const seen={},stack={};const go=id=>{if(stack[id])return 1;if(seen[id])return 0;seen[id]=stack[id]=1;const r=by(id).deps.some(go);stack[id]=0;return r};return S.levels.some(l=>go(l.id))}
+
+/* --- layout: sinusoidal snake from the spec --- */
+const CX=0,pos=i=>({x:Math.sin(i*.8)*160+CX,y:i*120});
+
+/* --- viewport (kept separate from business state) --- */
+const view={x:0,y:0,k:1},svg=$('map'),world=$('world');
+const apply=()=>world.setAttribute('transform',`translate(${view.x} ${view.y}) scale(${view.k})`);
+const size=()=>svg.getBoundingClientRect();
+function focus(i,k=1){const r=size(),p=pos(i);view.k=k;view.x=r.width/2-p.x*k;view.y=r.height/2-p.y*k;apply()}
+function fit(){const r=size(),k=Math.min(1.2,(r.height-140)/(S.levels.length*120+80),r.width/520);view.k=k;view.x=r.width/2;view.y=70*k+40;apply()}
+const centerActive=()=>{let i=S.levels.findIndex(l=>status(l)==='active');focus(i<0?S.levels.length-1:i)};
+
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);parent&&parent.appendChild(e);return e}
+let sel=null;
+function renderMap(){
+  world.innerHTML='';
+  const eg=el('g',{},world),ng=el('g',{},world);
+  S.levels.forEach((l,i)=>{const b=pos(i);l.deps.forEach(d=>{const j=S.levels.findIndex(x=>x.id===d),a=pos(j),dep=by(d);
+    const cls='edge'+(done(dep)?' lit':'')+(done(dep)&&!done(l)?' flow':'');
+    el('path',{class:cls,d:`M${a.x} ${a.y+34} C${a.x} ${a.y+94},${b.x} ${b.y-94},${b.x} ${b.y-34}`},eg)})});
+  S.levels.forEach((l,i)=>{const p=pos(i),s=status(l),dn=l.tasks.filter(t=>t.done).length,r=l.boss?44:34;
+    const g=el('g',{class:'node '+s,'data-id':l.id,tabindex:0,role:'button','aria-label':`${l.title}, ${s}`},ng);
+    const fill=s==='done'?'#ffc83d':s==='active'?(l.boss?'#ff6b5b':'#3fbf8f'):'var(--lock)';
+    el('circle',{cx:p.x,cy:p.y+5,r,fill:'#23304a'},g);
+    el('circle',{class:'body',cx:p.x,cy:p.y,r,fill,stroke:'#23304a','stroke-width':5},g);
+    const ic=el('text',{x:p.x,y:p.y+9,'text-anchor':'middle','font-size':l.boss?30:24},g);
+    ic.textContent=s==='locked'?'\u{1F512}':s==='done'?'\u2B50':l.boss?'\u{1F451}':'\u2694\uFE0F';
+    const t=el('text',{class:'lbl',x:p.x,y:p.y+r+20},g);t.textContent=l.title;
+    if(s!=='locked'){const c=el('text',{class:'lbl',x:p.x,y:p.y+r+38,'font-size':12},g);c.textContent=`${dn}/${l.tasks.length} tasks`}
+    g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open(l.id)}});
+  });
+}
+function renderHud(){
+  const xp=totalXp(),L=charLevel(xp),lo=th(L),hi=th(L+1);
+  $('lv').textContent='Lv '+L;$('xpt').textContent=`${xp} XP`;
+  $('xpb').style.width=Math.min(100,(xp-lo)/(hi-lo)*100)+'%';
+  $('streak').textContent=`\u{1F525} ${S.streak} day streak`;
+  $('log').innerHTML=S.log.slice(0,3).map(x=>`<div>${esc(x)}</div>`).join('')||'<div>No activity yet. Open the glowing level.</div>';
+}
+function renderDrawer(){
+  const d=$('drawer');if(!sel){d.classList.remove('open');return}
+  const l=by(sel),s=status(l),dn=l.tasks.filter(t=>t.done).length,pct=l.tasks.length?dn/l.tasks.length*100:0;
+  let h=`<button id="x" style="float:right">Close</button><h2>${l.boss?'\u{1F451} ':''}${esc(l.title)}</h2><div class="sub">${s==='done'?'Completed':s==='active'?'Active':'Locked'} &middot; ${bounty(l)} XP bounty</div><div class="pg"><i style="width:${pct}%"></i></div>`;
+  if(s==='locked'){h+=`<p>Finish these levels first: <b>${l.deps.filter(x=>!done(by(x))).map(x=>esc(by(x).title)).join(', ')}</b></p>`}
+  h+=l.tasks.map(t=>`<label class="task${t.done?' done':''}"><input type="checkbox" data-t="${t.id}" ${t.done?'checked':''} ${s==='locked'?'disabled':''}><span>${esc(t.t)}</span><em class="chip ${t.p}">${t.p}</em></label>`).join('');
+  if(s!=='locked')h+=`<div id="add"><input id="nt" placeholder="New task" maxlength="80"><select id="np"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select><button id="addb">Add</button></div>`;
+  d.innerHTML=h;d.classList.add('open');
+}
+const render=()=>{renderMap();renderHud();renderDrawer()};
+function open(id){sel=id;renderDrawer()}
+
+/* --- optimistic toggle: UI flips instantly, engine diffs statuses --- */
+function toggle(lid,tid){
+  const l=by(lid);if(status(l)==='locked')return;
+  const before=Object.fromEntries(S.levels.map(x=>[x.id,status(x)]));
+  const t=l.tasks.find(x=>x.id===tid);t.done=!t.done;
+  if(t.done){const td=new Date().toDateString();if(S.last!==td){S.streak=S.last===new Date(Date.now()-864e5).toDateString()?S.streak+1:1;S.last=td}
+    log(`Cleared "${t.t}" (+10 XP)`)}
+  S.levels.forEach(x=>{const a=status(x);if(before[x.id]!==a){
+    if(a==='done'){log(`${x.title} complete (+${bounty(x)} XP)`);toast(x.boss?'Boss defeated!':'Level cleared!');confetti(x.boss?90:45)}
+    if(a==='active'&&before[x.id]==='locked'){log(`${x.title} unlocked`);toast('New level unlocked: '+x.title)}}});
+  save();render();
+}
+const log=m=>{S.log.unshift(m);S.log=S.log.slice(0,20)};
+let tt;function toast(m){const e=$('toast');e.textContent=m;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),1800)}
+function confetti(c){const col=['#ffc83d','#ff6b5b','#3fbf8f','#5aa9ff'];for(let i=0;i<c;i++){const e=document.createElement('i');e.className='cf';
+  e.style.cssText=`left:50%;top:40%;background:${col[i%4]};--dx:${(Math.random()-.5)*600}px;--dy:${Math.random()*400+100}px`;document.body.appendChild(e);setTimeout(()=>e.remove(),1500)}}
+
+/* --- events --- */
+$('drawer').addEventListener('change',e=>{if(e.target.dataset.t)toggle(sel,e.target.dataset.t)});
+$('drawer').addEventListener('click',e=>{
+  if(e.target.id==='x'){sel=null;renderDrawer()}
+  if(e.target.id==='addb')addTask();
+});
+$('drawer').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='nt')addTask()});
+function addTask(){const i=$('nt'),v=i.value.trim();if(!v)return;by(sel).tasks.push(mk(v,$('np').value));log(`Added "${v}"`);save();render();$('nt')&&$('nt').focus()}
+$('center').onclick=centerActive;$('fit').onclick=fit;
+$('reset').onclick=()=>{S=seed();sel=null;save();render();centerActive()};
+let drag=null;
+svg.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y,moved:0}});
+addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.moved=Math.max(drag.moved,Math.abs(dx)+Math.abs(dy));if(drag.moved>5){view.x=drag.vx+dx;view.y=drag.vy+dy;apply()}});
+addEventListener('pointerup',e=>{if(drag&&drag.moved<=5){const g=e.target.closest&&e.target.closest('.node');if(g)open(g.dataset.id)}drag=null});
+svg.addEventListener('wheel',e=>{e.preventDefault();const r=size(),k=Math.max(.4,Math.min(2,view.k*(e.deltaY<0?1.1:.91))),mx=e.clientX-r.left,my=e.clientY-r.top;
+  view.x=mx-(mx-view.x)*k/view.k;view.y=my-(my-view.y)*k/view.k;view.k=k;apply()},{passive:false});
+addEventListener('resize',centerActive);
+if(hasCycle())console.error('Dependency cycle detected');
+render();centerActive();
+</script></body></html>

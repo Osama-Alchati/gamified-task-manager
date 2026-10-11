@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Gamified Task Manager
 
-## Getting Started
+A task manager where your roadmap is a cartoon overworld. Milestones are levels on a map, daily tasks live inside them, and clearing a level earns XP and unlocks the next ones.
 
-First, run the development server:
+**Status:** pre-Phase 1. Two clickable prototypes live in [`docs/prototypes/`](docs/prototypes) (open the HTML files in a browser). The real app starts from them.
+
+## Stack
+Next.js 15 (App Router), React 19, TypeScript, Tailwind, shadcn/ui, XYFlow (`@xyflow/react`), Zustand, TanStack Query v5, Framer Motion, PostgreSQL (Supabase or Neon), Prisma, Auth.js.
+
+## Get started
+Prerequisites: Node 20+, git, a PostgreSQL database, and optionally the [GitHub CLI](https://cli.github.com/).
 
 ```bash
+# 1. Create the app and overlay this starter kit
+bash scripts/bootstrap.sh
+
+# 2. Configure and migrate
+cd gamified-task-manager
+cp .env.example .env            # fill in DATABASE_URL, DIRECT_URL, AUTH_*
+npx prisma migrate dev --name init_roadmap_schema
+
+# 3. Publish to GitHub and open the Phase 1 issues
+gh repo create Osama-Alchati/gamified-task-manager --public --source=. --remote=origin --push
+bash scripts/create-issues.sh
+
+# 4. Run
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+If `prisma init` prints a different generator or config layout for your Prisma version, follow its output and keep the models from `prisma/schema.prisma`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## What is already here
+| Path | Purpose |
+|---|---|
+| `prisma/schema.prisma` | Users, worlds, levels, dependency edges, tasks, activity log, and the spec's indexes |
+| `lib/dag.ts` | Cycle check, level completion, status derivation, newly unlocked levels (pure functions) |
+| `lib/gamification.ts` | XP curve, level progress, bounties, timezone-aware streaks |
+| `lib/graph-layout.ts` | Sinusoidal snake layout from the spec |
+| `stores/useMapStore.ts` | Zustand store for selection, builder mode, sound |
+| `docs/ROADMAP.md` | Phased checklist, backlog from the prototype review, spec decisions |
+| `docs/prototypes/` | Prototype v1 (core loop) and v2 (visuals, builder, worlds, audio, mobile sheet) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Planned layout
+```
+app/(auth)/login, app/(dashboard)/worlds/[worldId]
+components/map (MapCanvas, LevelNode, AnimatedPathEdge, MapControls)
+components/hud (StatusHeader, RecentActivityDrawer)
+components/drawer (TaskDrawer, TaskItem)
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Conventions
+- Keep camera state out of business state: pan/zoom never re-renders task lists or hits the database.
+- Task toggles are optimistic; roll back with a toast on failure.
+- Anything that changes the graph validates it with `wouldCreateCycle` inside the same transaction.
