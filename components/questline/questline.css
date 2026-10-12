@@ -23,7 +23,9 @@
 .ql button:active{transform:translateY(3px);box-shadow:none}
 .ql button.on{background:var(--sun);color:#23304a}
 .ql button:focus-visible,.ql input:focus-visible,.ql select:focus-visible,.ql textarea:focus-visible,
-.ql .streak:focus-visible,.ql .node:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+.ql .streak:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+/* Remove the default rectangular focus outline on nodes — the sel-ring glow handles selection feedback */
+.ql .node:focus,.ql .node:focus-visible,.ql .node:focus-within{outline:none !important}
 
 /* HUD */
 .ql .hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:10px;right:10px;display:flex;gap:8px;
@@ -90,10 +92,14 @@
 .ql .cloud{animation:ql-drift 7s ease-in-out infinite alternate;pointer-events:none}
 @keyframes ql-drift{to{transform:translateX(22px)}}
 .ql .lbl{font-weight:800;font-size:15px;fill:var(--ink);text-anchor:middle}
-.ql .plus,.ql .minus{cursor:pointer}
-.ql .selring{fill:none;stroke:var(--sun);stroke-width:5;stroke-linecap:round;stroke-dasharray:12 9;
-  animation:ql-spin 5s linear infinite;pointer-events:none;filter:drop-shadow(0 0 6px #ffc83d)}
+.ql .plus,.ql .del{cursor:pointer}
+/* selection ring + glow */
+.ql .sel-ring{stroke:transparent;transition:stroke .25s,filter .25s}
+.ql .sel-ring[data-on]{stroke:var(--sun);filter:drop-shadow(0 0 12px rgba(255,215,0,.85));
+  animation:ql-spin 5s linear infinite}
 @keyframes ql-spin{to{stroke-dashoffset:-84}}
+/* glow on the coin body when selected */
+.ql .node:has(.sel-ring[data-on]) .body{filter:drop-shadow(0 0 14px rgba(250,204,21,.8));transition:filter .25s}
 
 /* effects appended to <body> by fx.ts */
 .ql-cf{position:fixed;width:10px;height:14px;border-radius:2px;z-index:8;pointer-events:none;animation:ql-fall 1.4s ease-out forwards}

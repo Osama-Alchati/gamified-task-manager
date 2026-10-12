@@ -13,7 +13,7 @@ import MapCanvas from './MapCanvas';
 import { useViewport } from './useViewport';
 import './questline.css';
 
-const noop = () => () => {};
+const noop = () => () => { };
 /** false on the server and during hydration, true afterwards (persisted state is client-only). */
 const useIsClient = () => useSyncExternalStore(noop, () => true, () => false);
 
@@ -117,6 +117,11 @@ export default function QuestlineApp({ fontClass = '' }: { fontClass?: string })
     if (id) setSel(id);
   };
 
+  const onRemove = (id: string) => {
+    removeLevel(id);
+    setSel(null);
+  };
+
   const onReset = () => {
     if (!window.confirm('Reset all worlds, XP and streak? This cannot be undone.')) return;
     resetAll();
@@ -141,9 +146,11 @@ export default function QuestlineApp({ fontClass = '' }: { fontClass?: string })
         world={world}
         builder={builder}
         vp={vp}
+        sel={sel}
         onOpen={setSel}
         onAddChild={onAddChild}
         onMove={moveLevel}
+        onRemove={onRemove}
       />
 
       <Hud

@@ -24,3 +24,14 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Remove React Flow default square selection border and focus outlines */
+.react-flow__node,
+.react-flow__node.selected,
+.react-flow__node:focus,
+.react-flow__node:focus-visible,
+.react-flow__node-default.selected {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}

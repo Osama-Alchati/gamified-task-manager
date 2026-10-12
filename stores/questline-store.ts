@@ -112,7 +112,30 @@ export const useQuestStore = create<QuestData & Actions>()(
         });
         return child.id;
       },
-
+      removeLevel: (levelId) => {
+        const s = get();
+        const world = s.worlds.find((w) => w.id === s.cur);
+        const gone = world?.levels.find((l) => l.id === levelId);
+        if (!world || !gone || world.levels.length <= 1) return; // never delete the last level
+        set({
+          worlds: s.worlds.map((w) =>
+            w.id !== s.cur
+              ? w
+              : {
+                ...w,
+                levels: w.levels
+                  .filter((l) => l.id !== levelId)
+                  // reconnect the children to the removed level's parents so the path stays unbroken
+                  .map((l) =>
+                    l.deps.includes(levelId)
+                      ? { ...l, deps: [...new Set([...l.deps.filter((d) => d !== levelId), ...gone.deps])] }
+                      : l,
+                  ),
+              },
+          ),
+          log: pushLog(s.log, `Removed ${gone.title}`),
+        });
+      },
       toggleSound: () => set((s) => ({ sound: !s.sound })),
 
       resetAll: () => set(createSeed()),
@@ -121,7 +144,7 @@ export const useQuestStore = create<QuestData & Actions>()(
       name: 'questline-v3',
       version: 1,
       storage: createJSONStorage(() => localStorage),
-      partialize: dataOf,
+      partialize: (s) => dataOf(s),
     },
   ),
 );

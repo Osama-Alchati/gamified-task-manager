@@ -35,16 +35,16 @@ type Gesture =
       ly: number;
     };
 
-export default function MapCanvas({ world, builder, vp, onOpen, onAddChild, onMove }: Props) {
+export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild, onRemove, onMove }: Props) {
   const { levels, theme } = world;
   const byId = (id: string) => levels.find((l) => l.id === id);
 
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<Gesture | null>(null);
   const spaceDown = useRef(false);
-  const latest = useRef({ world, builder, onOpen, onAddChild, onMove });
+  const latest = useRef({ world, builder, onOpen, onAddChild, onRemove, onMove });
   useEffect(() => {
-    latest.current = { world, builder, onOpen, onAddChild, onMove };
+    latest.current = { world, builder, onOpen, onAddChild, onRemove, onMove };
   });
 
   useEffect(() => {
@@ -90,8 +90,10 @@ export default function MapCanvas({ world, builder, vp, onOpen, onAddChild, onMo
       if (!g) return;
       if (!g.pinch && g.moved <= 5 && g.tgt) {
         const plus = g.tgt.closest('.plus');
+        const del = g.tgt.closest('.del');
         const node = g.tgt.closest('.node');
-        if (plus) latest.current.onAddChild(plus.getAttribute('data-id') ?? '');
+        if (del) latest.current.onRemove(del.getAttribute('data-id') ?? '');
+        else if (plus) latest.current.onAddChild(plus.getAttribute('data-id') ?? '');
         else if (node) latest.current.onOpen(node.getAttribute('data-id') ?? '');
       }
       if (!g.pinch || P.size < 2) gesture.current = null;
@@ -153,8 +155,10 @@ export default function MapCanvas({ world, builder, vp, onOpen, onAddChild, onMo
     }
     const target = e.target as Element;
     const nodeEl = target.closest('.node');
+    // Don't start a drag when clicking the delete or add buttons
+    const isActionBtn = !!(target.closest('.del') || target.closest('.plus'));
     const dragged =
-      builder && !spaceDown.current && nodeEl ? byId(nodeEl.getAttribute('data-id') ?? '') : undefined;
+      builder && !spaceDown.current && nodeEl && !isActionBtn ? byId(nodeEl.getAttribute('data-id') ?? '') : undefined;
     gesture.current = {
       pinch: false,
       x: e.clientX,
@@ -318,6 +322,17 @@ export default function MapCanvas({ world, builder, vp, onOpen, onAddChild, onMo
                 aria-label={`${l.title}, ${s}, ${dn} of ${tot} tasks`}
                 onKeyDown={(e) => onNodeKey(e, l.id)}
               >
+                <circle
+                  className="sel-ring"
+                  data-on={sel === l.id ? '' : undefined}
+                  cx={x}
+                  cy={y}
+                  r={r + 20}
+                  fill="none"
+                  strokeWidth={4}
+                  strokeDasharray="3 9"
+                  strokeLinecap="round"
+                />
                 {l.boss && s !== 'locked' && (
                   <circle className="aura" cx={x} cy={y} r={r + 22} fill="#ffc83d" fillOpacity={0.32} />
                 )}
@@ -399,6 +414,28 @@ export default function MapCanvas({ world, builder, vp, onOpen, onAddChild, onMo
                 <text className="lbl" x={x} y={ly + 1}>
                   {label}
                 </text>
+                {builder && levels.length > 1 && (
+                  <g className="del" data-id={l.id} role="button" aria-label="Delete level">
+                    <circle
+                      cx={x - r * 0.8}
+                      cy={y + r * 0.8}
+                      r={13}
+                      fill="#ff6b5b"
+                      stroke="#23304a"
+                      strokeWidth={3}
+                    />
+                    <text
+                      x={x - r * 0.8}
+                      y={y + r * 0.8 + 5}
+                      textAnchor="middle"
+                      fontSize={14}
+                      fontWeight={800}
+                      fill="#fff"
+                    >
+                      ✕
+                    </text>
+                  </g>
+                )}
                 {builder && (
                   <g className="plus" data-id={l.id} role="button" aria-label="Add child level">
                     <circle
