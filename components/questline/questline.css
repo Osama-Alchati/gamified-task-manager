@@ -1,0 +1,113 @@
+/* components/questline/questline.css
+   Port of the V3 prototype styles. Everything is scoped under .ql so it cannot leak into the host app.
+   .ql-cf / .ql-fxp are appended to <body> by fx.ts, so they are global and use hard-coded colours. */
+
+.ql{--ink:#23304a;--panel:#fffaf0;--sun:#ffc83d;--coral:#ff6b5b;--mint:#3fbf8f;--line:#23304a30;
+  --sky:#bfe8f5;--isl:#a6e08f;--isl2:#7ec56f;
+  position:fixed;inset:0;overflow:hidden;color:var(--ink);background:var(--sky);
+  font-family:var(--font-baloo),'Baloo 2',ui-rounded,system-ui,sans-serif}
+.ql[data-w=desert]{--sky:#ffe3b0;--isl:#f2cf86;--isl2:#dcae58}
+.ql[data-w=space]{--sky:#1c1f4a;--isl:#4d52a3;--isl2:#363a80}
+@media(prefers-color-scheme:dark){
+  .ql{--ink:#eaf1ff;--panel:#26324a;--line:#ffffff30}
+  .ql[data-w=forest]{--sky:#16314a;--isl:#2f6b52;--isl2:#245441}
+  .ql[data-w=desert]{--sky:#3b2f22;--isl:#8d7240;--isl2:#6e5a32}
+}
+
+.ql .map{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.ql.bld .map{cursor:crosshair}
+
+/* buttons + form controls */
+.ql button{font:inherit;font-weight:700;color:var(--ink);background:var(--panel);border:3px solid var(--ink);
+  border-radius:14px;padding:2px 12px;box-shadow:0 3px 0 var(--ink);cursor:pointer}
+.ql button:active{transform:translateY(3px);box-shadow:none}
+.ql button.on{background:var(--sun);color:#23304a}
+.ql button:focus-visible,.ql input:focus-visible,.ql select:focus-visible,.ql textarea:focus-visible,
+.ql .streak:focus-visible,.ql .node:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+
+/* HUD */
+.ql .hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:10px;right:10px;display:flex;gap:8px;
+  align-items:center;flex-wrap:wrap;pointer-events:none;z-index:4}
+.ql .pill{pointer-events:auto;position:relative;background:var(--panel);border:3px solid var(--ink);border-radius:18px;
+  padding:2px 12px;box-shadow:0 4px 0 var(--ink);font-weight:700}
+.ql .pill select{font:inherit;font-weight:700;background:transparent;color:var(--ink);border:0;max-width:130px}
+.ql .lv{font-size:1.15rem;font-weight:800}
+.ql .xp{display:flex;align-items:center;gap:8px}
+.ql .bar{width:140px;height:14px;border:2px solid var(--ink);border-radius:9px;background:var(--line);overflow:hidden}
+.ql .bar i{display:block;height:100%;background:var(--sun);transition:width .35s cubic-bezier(.3,1.6,.5,1)}
+.ql .pop{display:none;position:absolute;top:110%;left:0;grid-template-columns:repeat(7,16px);gap:4px;
+  background:var(--panel);border:3px solid var(--ink);border-radius:12px;padding:8px}
+.ql .streak:hover .pop,.ql .streak:focus .pop{display:grid}
+.ql .pop b{width:16px;height:16px;border-radius:4px;background:var(--line)}
+.ql .pop b.h1{background:#9be3c4}.ql .pop b.h2{background:var(--mint)}.ql .pop b.h3{background:#1d8c63}
+
+/* toolbar, log, toast */
+.ql .tools{position:fixed;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;gap:8px;flex-wrap:wrap;z-index:4}
+.ql .log{position:fixed;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);max-width:250px;font-size:.8rem;
+  background:var(--panel);border:3px solid var(--ink);border-radius:14px;padding:4px 10px;z-index:3}
+.ql .log div{margin:2px 0}
+.ql .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 84px);transform:translate(-50%,-20px);
+  background:var(--ink);color:var(--panel);padding:6px 18px;border-radius:16px;font-weight:800;opacity:0;
+  transition:.3s;pointer-events:none;z-index:9;text-align:center}
+.ql .toast[data-on]{opacity:1;transform:translate(-50%,0)}
+
+/* drawer */
+.ql .drawer{position:fixed;top:0;right:0;bottom:0;width:min(390px,100%);box-sizing:border-box;background:var(--panel);
+  border-left:4px solid var(--ink);padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 16px;
+  transform:translateX(105%);transition:transform .35s cubic-bezier(.3,1.3,.5,1);overflow:auto;z-index:6}
+.ql .drawer.open{transform:none}
+.ql .drawer h2{margin:0;font-size:1.45rem;font-weight:800}
+.ql .cl{float:right}.ql .sub{opacity:.75;font-size:.9rem}
+.ql .pg{height:16px;border:3px solid var(--ink);border-radius:10px;overflow:hidden;margin:8px 0;background:var(--line)}
+.ql .pg i{display:block;height:100%;background:var(--mint);transition:width .3s}
+.ql .task{border-bottom:2px dashed var(--line);padding:6px 2px}
+.ql .row{display:flex;align-items:center;gap:8px}
+.ql .row input[type=checkbox]{width:24px;height:24px;accent-color:var(--mint);flex:none}
+.ql .tt{flex:1;min-width:0}.ql .task.done .tt{text-decoration:line-through;opacity:.55}
+.ql .chip{font-size:.7rem;font-style:normal;border:2px solid var(--ink);border-radius:9px;padding:0 6px}
+.ql .chip.Critical{background:var(--coral);color:#fff;border-color:var(--coral)}
+.ql .chip.High{background:var(--sun);color:#23304a;border-color:var(--sun)}
+.ql .mini{padding:0 8px;box-shadow:none;border-width:2px}
+.ql .meta{font-size:.78rem;opacity:.75;margin-left:32px}
+.ql .det{margin:6px 0 4px 32px;display:grid;gap:6px}
+.ql .det textarea,.ql .edit input,.ql .add input,.ql .add select{font:inherit;border:3px solid var(--ink);
+  border-radius:12px;padding:2px 8px;background:var(--panel);color:var(--ink);min-width:0}
+.ql .det textarea{min-height:64px;resize:vertical;font-size:.9rem}
+.ql .det label{font-size:.8rem;margin-right:10px}
+.ql .det label input{border:2px solid var(--ink);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;width:auto;max-width:120px}
+.ql .edit{display:flex;gap:6px;margin:8px 0}.ql .edit input:first-child{flex:1}
+.ql .add{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}.ql .add input{flex:1 1 120px}
+
+/* map */
+.ql .node{cursor:pointer}.ql.bld .node{cursor:move}
+.ql .node.active .body{filter:drop-shadow(0 0 9px #fff6b0);animation:ql-pulse 1.8s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+.ql .aura{animation:ql-pulse 2.2s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes ql-pulse{50%{transform:scale(1.08)}}
+.ql .stone{fill:none;stroke:#fff;stroke-opacity:.55;stroke-width:11;stroke-linecap:round;stroke-dasharray:.1 22}
+.ql .stone.lit{stroke:var(--sun);stroke-opacity:1}
+.ql .stone.flow{stroke:var(--mint);stroke-opacity:1;animation:ql-dash 1.2s linear infinite}
+@keyframes ql-dash{to{stroke-dashoffset:-22}}
+.ql .cloud{animation:ql-drift 7s ease-in-out infinite alternate;pointer-events:none}
+@keyframes ql-drift{to{transform:translateX(22px)}}
+.ql .lbl{font-weight:800;font-size:15px;fill:var(--ink);text-anchor:middle}
+.ql .plus,.ql .minus{cursor:pointer}
+.ql .selring{fill:none;stroke:var(--sun);stroke-width:5;stroke-linecap:round;stroke-dasharray:12 9;
+  animation:ql-spin 5s linear infinite;pointer-events:none;filter:drop-shadow(0 0 6px #ffc83d)}
+@keyframes ql-spin{to{stroke-dashoffset:-84}}
+
+/* effects appended to <body> by fx.ts */
+.ql-cf{position:fixed;width:10px;height:14px;border-radius:2px;z-index:8;pointer-events:none;animation:ql-fall 1.4s ease-out forwards}
+@keyframes ql-fall{to{transform:translate(var(--dx),var(--dy)) rotate(720deg);opacity:0}}
+.ql-fxp{position:fixed;z-index:9;font-family:inherit;font-weight:800;color:#23304a;background:#ffc83d;border-radius:10px;padding:0 8px;pointer-events:none}
+
+@media(max-width:768px){
+  .ql .drawer{top:auto;left:0;right:0;bottom:0;width:auto;height:72vh;border-left:0;border-top:4px solid var(--ink);
+    border-radius:22px 22px 0 0;transform:translateY(105%)}
+  .ql .drawer.open{transform:none}
+  .ql .log{display:none}
+  .ql .bar{width:80px}
+}
+@media(prefers-reduced-motion:reduce){
+  .ql *{animation:none!important;transition:none!important}
+  .ql-cf{display:none}
+}
