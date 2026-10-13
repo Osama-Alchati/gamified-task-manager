@@ -27,7 +27,7 @@ export default function QuestlineApp({ fontClass = '' }: { fontClass?: string })
   const days = useQuestStore((s) => s.days);
   const log = useQuestStore((s) => s.log);
   const sound = useQuestStore((s) => s.sound);
-  const { setWorld, toggleTask, addTask, updateTask, updateLevel, moveLevel, addChild, removeLevel, toggleSound, resetAll } =
+  const { setWorld, toggleTask, addTask, updateTask, removeTask, updateLevel, moveLevel, addChild, removeLevel, toggleDep, toggleSound, resetAll } =
     useQuestStore.getState();
 
   const [sel, setSel] = useState<string | null>(null);
@@ -53,12 +53,21 @@ export default function QuestlineApp({ fontClass = '' }: { fontClass?: string })
 
   /* keep the active level centred on resize / rotation (debounced) */
   const levelsRef = useRef(world.levels);
-  levelsRef.current = world.levels;
+  const selRef = useRef(sel);
+  useEffect(() => {
+    levelsRef.current = world.levels;
+    selRef.current = sel;
+  });
   useEffect(() => {
     let t = 0;
     const onResize = () => {
       window.clearTimeout(t);
-      t = window.setTimeout(() => vp.centerActive(levelsRef.current), 150);
+      t = window.setTimeout(() => {
+        const active = document.activeElement;
+        if (selRef.current != null) return;
+        if (active && /INPUT|TEXTAREA|SELECT/.test(active.tagName)) return;
+        vp.centerActive(levelsRef.current);
+      }, 150);
     };
     window.addEventListener('resize', onResize);
     return () => {
@@ -71,7 +80,7 @@ export default function QuestlineApp({ fontClass = '' }: { fontClass?: string })
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing = /INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement).tagName);
-      if (e.key === 'Escape') setSel(null);
+      if (e.key === 'Escape' && !typing) setSel(null);
       if (typing) return;
       if (e.key === 'f' || e.key === 'F') vp.centerActive(levelsRef.current);
     };
@@ -103,6 +112,12 @@ export default function QuestlineApp({ fontClass = '' }: { fontClass?: string })
     }
     if (res.cleared.length) say(res.cleared.some((c) => c.boss) ? 'Boss defeated!' : 'Level cleared!');
     else if (res.unlocked.length) say('Unlocked: ' + res.unlocked.map((u) => u.title).join(', '));
+    else if (!res.taskDone) {
+      const level = world.levels.find((l) => l.id === levelId);
+      if (level && level.tasks.some((t) => !t.done)) {
+        say('Level reopened — task unchecked');
+      }
+    }
   };
 
   const onWorld = (id: string) => {
@@ -184,6 +199,7 @@ export default function QuestlineApp({ fontClass = '' }: { fontClass?: string })
       </div>
 
       <Drawer
+        key={sel}
         level={selected}
         levels={world.levels}
         builder={builder}
@@ -191,7 +207,9 @@ export default function QuestlineApp({ fontClass = '' }: { fontClass?: string })
         onToggle={onToggle}
         onAddTask={addTask}
         onUpdateTask={updateTask}
+        onRemoveTask={removeTask}
         onUpdateLevel={updateLevel}
+        onToggleDep={toggleDep}
       />
 
       <div className="toast" role="status" data-on={toast ? '' : undefined}>

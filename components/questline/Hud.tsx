@@ -1,6 +1,6 @@
 'use client';
 
-import { charLevel, threshold } from '@/lib/questline/engine';
+import { charLevel, shiftDays, threshold, toDateKey } from '@/lib/questline/engine';
 
 interface Props {
   worlds: { id: string; name: string }[];
@@ -19,7 +19,7 @@ export default function Hud({ worlds, cur, xp, streak, days, onWorld }: Props) {
 
   const cells = [];
   for (let i = 13; i >= 0; i--) {
-    const key = new Date(Date.now() - i * 864e5).toDateString();
+    const key = toDateKey(shiftDays(new Date(), -i));
     const c = days[key] || 0;
     const cls = c >= 5 ? 'h3' : c >= 3 ? 'h2' : c ? 'h1' : '';
     cells.push(<b key={key} className={cls} title={`${c} tasks`} />);

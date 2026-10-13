@@ -6,6 +6,7 @@ function tone(enabled: boolean, freq: number, dur: number, delay = 0) {
   if (!enabled) return;
   try {
     ac = ac ?? new AudioContext();
+    if (ac.state === 'suspended') void ac.resume();
     const o = ac.createOscillator();
     const g = ac.createGain();
     const start = ac.currentTime + delay;
@@ -17,6 +18,10 @@ function tone(enabled: boolean, freq: number, dur: number, delay = 0) {
     g.connect(ac.destination);
     o.start(start);
     o.stop(start + dur);
+    o.onended = () => {
+      o.disconnect();
+      g.disconnect();
+    };
   } catch {
     /* audio not available */
   }
