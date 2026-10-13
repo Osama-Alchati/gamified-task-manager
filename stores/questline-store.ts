@@ -6,6 +6,7 @@ import {
   makeTask,
   pushLog,
   uid,
+  wouldCreateCycleForLevels,
   type Level,
   type Priority,
   type QuestData,
@@ -20,7 +21,9 @@ interface Actions {
   toggleTask: (levelId: string, taskId: string) => ToggleResult | null;
   addTask: (levelId: string, title: string, type: TaskType, p: Priority) => void;
   updateTask: (levelId: string, taskId: string, patch: Partial<Task>) => void;
-  updateLevel: (levelId: string, patch: Partial<Pick<Level, 'title' | 'icon' | 'xp'>>) => void;
+  removeTask: (levelId: string, taskId: string) => void;
+  updateLevel: (levelId: string, patch: Partial<Pick<Level, 'title' | 'icon' | 'xp' | 'boss'>>) => void;
+  toggleDep: (levelId: string, depId: string) => void;
   moveLevel: (levelId: string, x: number, y: number) => void;
   addChild: (parentId: string) => string | null;
   removeLevel: (levelId: string) => void;
@@ -83,8 +86,41 @@ export const useQuestStore = create<QuestData & Actions>()(
           })),
         })),
 
+      removeTask: (levelId, taskId) =>
+        set((s) => ({
+          worlds: patchLevel(s, levelId, (l) => ({
+            ...l,
+            tasks: l.tasks.filter((t) => t.id !== taskId),
+          })),
+          log: pushLog(s.log, 'Removed a task'),
+        })),
+
       updateLevel: (levelId, patch) =>
         set((s) => ({ worlds: patchLevel(s, levelId, (l) => ({ ...l, ...patch })) })),
+
+      toggleDep: (levelId, depId) => {
+        const s = get();
+        const world = s.worlds.find((w) => w.id === s.cur);
+        const level = world?.levels.find((l) => l.id === levelId);
+        if (!world || !level) return;
+        const hasDep = level.deps.includes(depId);
+        if (!hasDep && wouldCreateCycleForLevels(world.levels, levelId, depId)) return;
+        set({
+          worlds: s.worlds.map((w) =>
+            w.id !== s.cur
+              ? w
+              : {
+                ...w,
+                levels: w.levels.map((l) =>
+                  l.id === levelId
+                    ? { ...l, deps: hasDep ? l.deps.filter((d) => d !== depId) : [...l.deps, depId] }
+                    : l,
+                ),
+              },
+          ),
+          log: pushLog(s.log, hasDep ? 'Removed prerequisite' : 'Added prerequisite'),
+        });
+      },
 
       moveLevel: (levelId, x, y) =>
         set((s) => ({ worlds: patchLevel(s, levelId, (l) => ({ ...l, x, y })) })),

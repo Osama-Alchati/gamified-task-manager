@@ -33,22 +33,27 @@ type Gesture =
       nodeId: string | null;
       lx: number;
       ly: number;
+      finalX?: number;
+      finalY?: number;
     };
 
 export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild, onRemove, onMove }: Props) {
   const { levels, theme } = world;
   const byId = (id: string) => levels.find((l) => l.id === id);
 
+  const svgRef = useRef<SVGSVGElement>(null);
+  const gRef = useRef<SVGGElement>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<Gesture | null>(null);
   const spaceDown = useRef(false);
   const latest = useRef({ world, builder, onOpen, onAddChild, onRemove, onMove });
   useEffect(() => {
     latest.current = { world, builder, onOpen, onAddChild, onRemove, onMove };
+    vp.setElements(svgRef.current, gRef.current);
   });
 
   useEffect(() => {
-    const svg = vp.svgRef.current;
+    const svg = svgRef.current;
     if (!svg) return;
     const P = pointers.current;
 
@@ -76,7 +81,16 @@ export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild,
       g.moved = Math.max(g.moved, Math.abs(dx) + Math.abs(dy));
       if (g.moved <= 5) return;
       if (g.nodeId) {
-        latest.current.onMove(g.nodeId, Math.round(g.lx + dx / v.k), Math.round(g.ly + dy / v.k));
+        // Buffer position — committed on pointerup to avoid per-pixel store writes
+        g.finalX = Math.round(g.lx + dx / v.k);
+        g.finalY = Math.round(g.ly + dy / v.k);
+        // Visually move node via DOM
+        const el = svgRef.current?.querySelector(`[data-id="${g.nodeId}"]`);
+        if (el) {
+          const ox = g.finalX - g.lx;
+          const oy = g.finalY - g.ly;
+          el.setAttribute('transform', `translate(${ox} ${oy})`);
+        }
       } else {
         vp.view.current = { ...v, x: g.vx + dx, y: g.vy + dy };
         vp.apply();
@@ -96,6 +110,13 @@ export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild,
         else if (plus) latest.current.onAddChild(plus.getAttribute('data-id') ?? '');
         else if (node) latest.current.onOpen(node.getAttribute('data-id') ?? '');
       }
+      // Commit buffered node drag
+      if (!g.pinch && g.nodeId && g.moved > 5 && g.finalX != null && g.finalY != null) {
+        // Clear visual transform
+        const el = svgRef.current?.querySelector(`[data-id="${g.nodeId}"]`);
+        if (el) el.removeAttribute('transform');
+        latest.current.onMove(g.nodeId, g.finalX, g.finalY);
+      }
       if (!g.pinch || P.size < 2) gesture.current = null;
     };
 
@@ -111,7 +132,7 @@ export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild,
     };
 
     const keydown = (e: KeyboardEvent) => {
-      if (e.key === ' ' && e.target === document.body) {
+      if (e.key === ' ' && !/INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement)?.tagName ?? '')) {
         spaceDown.current = true;
         e.preventDefault();
       }
@@ -119,12 +140,18 @@ export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild,
     const keyup = (e: KeyboardEvent) => {
       if (e.key === ' ') spaceDown.current = false;
     };
+    const blur = () => {
+      spaceDown.current = false;
+      pointers.current.clear();
+      gesture.current = null;
+    };
 
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
     window.addEventListener('keydown', keydown);
     window.addEventListener('keyup', keyup);
+    window.addEventListener('blur', blur);
     svg.addEventListener('wheel', wheel, { passive: false });
     return () => {
       window.removeEventListener('pointermove', move);
@@ -132,6 +159,7 @@ export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild,
       window.removeEventListener('pointercancel', up);
       window.removeEventListener('keydown', keydown);
       window.removeEventListener('keyup', keyup);
+      window.removeEventListener('blur', blur);
       svg.removeEventListener('wheel', wheel);
     };
   }, [vp]);
@@ -140,7 +168,7 @@ export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild,
     const P = pointers.current;
     P.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const v = vp.view.current;
-    if (P.size === 2) {
+    if (P.size >= 2) {
       const [a, b] = [...P.values()];
       gesture.current = {
         pinch: true,
@@ -182,13 +210,13 @@ export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild,
   };
 
   return (
-    <svg ref={vp.svgRef} className="map" aria-label="Roadmap overworld" onPointerDown={onPointerDown}>
+    <svg ref={svgRef} className="map" aria-label="Roadmap overworld" onPointerDown={onPointerDown}>
       <defs>
         <pattern id="ql-dots" width="30" height="30" patternUnits="userSpaceOnUse">
           <circle cx="3" cy="3" r="1.7" fill="#fff" opacity=".4" />
         </pattern>
       </defs>
-      <g ref={vp.gRef}>
+      <g ref={gRef}>
         <rect x={-3000} y={-3000} width={6000} height={6000} fill="url(#ql-dots)" />
 
         {/* sky rings */}
@@ -310,7 +338,14 @@ export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild,
               s === 'done' ? '#ffc83d' : s === 'active' ? (l.boss ? '#ff6b5b' : '#3fbf8f') : '#8d96a3';
             const ring = 2 * Math.PI * (r + 9);
             const label = s === 'locked' ? l.title : `${l.title}  ${dn}/${tot}`;
-            const labelW = label.length * 8 + 24;
+            const labelW = (() => {
+              let w = 0;
+              for (const ch of label) {
+                const cp = ch.codePointAt(0) ?? 0;
+                w += cp > 0x2e7f || (cp >= 0x1100 && cp <= 0x115f) || cp >= 0xfe00 ? 14 : 8;
+              }
+              return w + 24;
+            })();
             const ly = y + r + 24;
             return (
               <g
@@ -415,7 +450,20 @@ export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild,
                   {label}
                 </text>
                 {builder && levels.length > 1 && (
-                  <g className="del" data-id={l.id} role="button" aria-label="Delete level">
+                  <g
+                    className="del"
+                    data-id={l.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Delete level"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onRemove(l.id);
+                      }
+                    }}
+                  >
                     <circle
                       cx={x - r * 0.8}
                       cy={y + r * 0.8}
@@ -437,7 +485,20 @@ export default function MapCanvas({ world, builder, sel, vp, onOpen, onAddChild,
                   </g>
                 )}
                 {builder && (
-                  <g className="plus" data-id={l.id} role="button" aria-label="Add child level">
+                  <g
+                    className="plus"
+                    data-id={l.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Add child level"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onAddChild(l.id);
+                      }
+                    }}
+                  >
                     <circle
                       cx={x + r * 0.8}
                       cy={y + r * 0.8}

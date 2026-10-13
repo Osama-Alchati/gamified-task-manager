@@ -22,7 +22,9 @@ interface Props {
   onToggle: (levelId: string, taskId: string, checkbox: HTMLInputElement) => void;
   onAddTask: (levelId: string, title: string, type: TaskType, p: Priority) => void;
   onUpdateTask: (levelId: string, taskId: string, patch: Partial<Task>) => void;
-  onUpdateLevel: (levelId: string, patch: Partial<Pick<Level, 'title' | 'icon' | 'xp'>>) => void;
+  onRemoveTask: (levelId: string, taskId: string) => void;
+  onUpdateLevel: (levelId: string, patch: Partial<Pick<Level, 'title' | 'icon' | 'xp' | 'boss'>>) => void;
+  onToggleDep: (levelId: string, depId: string) => void;
 }
 
 const dueText = (d: string) => {
@@ -43,7 +45,9 @@ export default function Drawer({
   onToggle,
   onAddTask,
   onUpdateTask,
+  onRemoveTask,
   onUpdateLevel,
+  onToggleDep,
 }: Props) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<TaskType>('code');
@@ -90,10 +94,20 @@ export default function Drawer({
           />
           <input
             defaultValue={level.icon}
-            maxLength={2}
             style={{ width: 50 }}
             aria-label="Icon"
-            onBlur={(e) => onUpdateLevel(level.id, { icon: e.target.value || '⚔️' })}
+            onBlur={(e) => {
+              const raw = e.target.value;
+              if (!raw) { onUpdateLevel(level.id, { icon: '⚔️' }); return; }
+              // Extract first grapheme cluster so composite emojis aren't truncated
+              if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+                const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+                const first = seg.segment(raw)[Symbol.iterator]().next().value;
+                onUpdateLevel(level.id, { icon: first?.segment ?? raw });
+              } else {
+                onUpdateLevel(level.id, { icon: raw.slice(0, 2) });
+              }
+            }}
           />
           <input
             type="number"
@@ -101,8 +115,32 @@ export default function Drawer({
             defaultValue={bounty(level)}
             style={{ width: 72 }}
             aria-label="XP bounty"
-            onBlur={(e) => onUpdateLevel(level.id, { xp: Math.max(0, +e.target.value || 0) })}
+            onBlur={(e) => onUpdateLevel(level.id, { xp: e.target.value === '' ? null : Math.max(0, +e.target.value) })}
           />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <input
+              type="checkbox"
+              checked={level.boss}
+              onChange={() => onUpdateLevel(level.id, { boss: !level.boss })}
+            />
+            Boss level
+          </label>
+        </div>
+      )}
+
+      {builder && (
+        <div className="edit" style={{ flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '.8rem', fontWeight: 700, width: '100%' }}>Prerequisites:</span>
+          {levels.filter((o) => o.id !== level.id).map((o) => (
+            <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.85rem' }}>
+              <input
+                type="checkbox"
+                checked={level.deps.includes(o.id)}
+                onChange={() => onToggleDep(level.id, o.id)}
+              />
+              {o.icon} {o.title}
+            </label>
+          ))}
         </div>
       )}
 
@@ -124,15 +162,57 @@ export default function Drawer({
                 aria-label="Complete task"
                 onChange={(e: ChangeEvent<HTMLInputElement>) => onToggle(level.id, t.id, e.target)}
               />
-              <button
-                type="button"
-                className="tt"
-                aria-expanded={t.open}
-                onClick={() => onUpdateTask(level.id, t.id, { open: !t.open })}
-              >
-                {TASK_ICON[t.type]} {t.t}
-              </button>
-              <em className={`chip ${t.p}`}>{t.p}</em>
+              {builder ? (
+                <>
+                  <input
+                    className="tt"
+                    defaultValue={t.t}
+                    aria-label="Task title"
+                    onBlur={(e) => onUpdateTask(level.id, t.id, { t: e.target.value || 'Untitled' })}
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                  <select
+                    value={t.type}
+                    aria-label="Task type"
+                    onChange={(e) => onUpdateTask(level.id, t.id, { type: e.target.value as TaskType })}
+                    style={{ width: 80 }}
+                  >
+                    {TASK_TYPES.map((k) => (
+                      <option key={k} value={k}>{TASK_ICON[k]} {k}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={t.p}
+                    aria-label="Priority"
+                    onChange={(e) => onUpdateTask(level.id, t.id, { p: e.target.value as Priority })}
+                    style={{ width: 80 }}
+                  >
+                    {PRIORITIES.map((p) => (
+                      <option key={p}>{p}</option>
+                    ))}
+                  </select>
+                  <button
+                    className="mini"
+                    aria-label="Delete task"
+                    onClick={() => onRemoveTask(level.id, t.id)}
+                    style={{ color: 'var(--coral)' }}
+                  >
+                    ✕
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="tt"
+                    aria-expanded={t.open}
+                    onClick={() => onUpdateTask(level.id, t.id, { open: !t.open })}
+                  >
+                    {TASK_ICON[t.type]} {t.t}
+                  </button>
+                  <em className={`chip ${t.p}`}>{t.p}</em>
+                </>
+              )}
               <button
                 className="mini"
                 aria-expanded={t.open}

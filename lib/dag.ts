@@ -29,7 +29,7 @@ export function wouldCreateCycle(edges: Edge[], edge: Edge): boolean {
 export const isLevelComplete = (tasks: { isCompleted: boolean }[]) =>
   tasks.length > 0 && tasks.every((t) => t.isCompleted);
 
-/** Derive every level's status from which levels are complete. */
+/** Derive every level's status from which levels are complete (with transitive prereq checks, cycle protection, and memoization). */
 export function computeStatuses(
   levelIds: string[],
   complete: Set<string>,
@@ -41,11 +41,35 @@ export function computeStatuses(
     list.push(e.sourceLevelId);
     prereqs.set(e.targetLevelId, list);
   }
+
+  const memo = new Map<string, LevelStatus>();
+  const visiting = new Set<string>();
+
+  function resolve(id: string): LevelStatus {
+    if (memo.has(id)) return memo.get(id)!;
+    if (visiting.has(id)) return "LOCKED"; // cycle protection
+    visiting.add(id);
+
+    const parents = prereqs.get(id) ?? [];
+    const allAncestorsComplete = parents.every((p) => resolve(p) === "COMPLETED");
+
+    let status: LevelStatus;
+    if (!allAncestorsComplete && parents.length > 0) {
+      status = "LOCKED";
+    } else if (complete.has(id)) {
+      status = "COMPLETED";
+    } else {
+      status = "ACTIVE";
+    }
+
+    visiting.delete(id);
+    memo.set(id, status);
+    return status;
+  }
+
   const result: Record<string, LevelStatus> = {};
   for (const id of levelIds) {
-    if (complete.has(id)) result[id] = "COMPLETED";
-    else if ((prereqs.get(id) ?? []).every((p) => complete.has(p))) result[id] = "ACTIVE";
-    else result[id] = "LOCKED";
+    result[id] = resolve(id);
   }
   return result;
 }

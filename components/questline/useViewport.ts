@@ -4,6 +4,7 @@ import { levelStatus, type Level } from '@/lib/questline/engine';
 export interface Viewport {
   svgRef: RefObject<SVGSVGElement | null>;
   gRef: RefObject<SVGGElement | null>;
+  setElements: (svg: SVGSVGElement | null, g: SVGGElement | null) => void;
   view: RefObject<{ x: number; y: number; k: number }>;
   apply: () => void;
   size: () => DOMRect;
@@ -62,6 +63,10 @@ export function useViewport(): Viewport {
       const v = view.current;
       return { x: r.left + v.x + l.x * v.k, y: r.top + v.y + l.y * v.k };
     };
-    return { svgRef, gRef, view, apply, size, clamp, focus, fit, centerActive, screenOf };
+    const setElements = (svg: SVGSVGElement | null, g: SVGGElement | null) => {
+      svgRef.current = svg;
+      gRef.current = g;
+    };
+    return { svgRef, gRef, setElements, view, apply, size, clamp, focus, fit, centerActive, screenOf };
   }, []);
 }
